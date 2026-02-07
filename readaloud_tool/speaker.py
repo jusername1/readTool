@@ -1,6 +1,7 @@
 import logging
 import threading
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 from readaloud_tool.player import AudioPlayer
 from readaloud_tool.text import clean_text, chunk_text
@@ -48,30 +49,62 @@ class Speaker:
         t.start()
 
     def _run_job(self, job_id: int, text: str) -> None:
-        try:
-            for part in chunk_text(text, max_chars=900):
-                with self._lock:
-                    if job_id != self._job_id:
-                        return
+        # Convert to list to enable lookahead
+        chunks = list(chunk_text(text, max_chars=900))
+        if not chunks:
+            self._emit_status("Ready")
+            return
 
-                try:
-                    wav_path = self._tts.synthesize_to_wav_file(part)
-                except Exception as exc:
-                    logging.exception("TTS synthesis failed")
-                    self._emit_error(f"TTS failed: {self._format_error(exc)}")
+        executor = ThreadPoolExecutor(max_workers=1)
+        try:
+            # Synthesize first chunk
+            with self._lock:
+                if job_id != self._job_id:
                     return
 
+            try:
+                current_wav = self._tts.synthesize_to_wav_file(chunks[0])
+            except Exception as exc:
+                logging.exception("TTS synthesis failed")
+                self._emit_error(f"TTS failed: {self._format_error(exc)}")
+                return
+
+            # Process each chunk with lookahead
+            for i in range(len(chunks)):
+                # Check if cancelled
                 with self._lock:
                     if job_id != self._job_id:
                         return
 
+                # Start synthesizing next chunk in background (if exists)
+                next_future = None
+                if i + 1 < len(chunks):
+                    next_future = executor.submit(
+                        self._tts.synthesize_to_wav_file,
+                        chunks[i + 1]
+                    )
+
+                # Play current chunk (blocking)
                 try:
-                    self._player.play_wav_file_blocking(wav_path)
+                    self._player.play_wav_file_blocking(current_wav)
                 except Exception as exc:
                     logging.exception("Audio playback failed")
                     self._emit_error(f"Audio playback failed: {self._format_error(exc)}")
                     return
+
+                # Wait for next synthesis to complete
+                if next_future:
+                    with self._lock:
+                        if job_id != self._job_id:
+                            return
+                    try:
+                        current_wav = next_future.result()
+                    except Exception as exc:
+                        logging.exception("TTS synthesis failed")
+                        self._emit_error(f"TTS failed: {self._format_error(exc)}")
+                        return
         finally:
+            executor.shutdown(wait=False)
             with self._lock:
                 should_emit = job_id == self._job_id
             if should_emit:

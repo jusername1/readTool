@@ -13,7 +13,7 @@ from readaloud_tool.ui_status import StatusUi
 
 
 def main() -> None:
-    load_dotenv()
+    load_dotenv(override=True)
 
     log_path = os.path.join(tempfile.gettempdir(), "readaloud_tool.log")
     logging.basicConfig(
@@ -55,6 +55,24 @@ def main() -> None:
             logging.exception("Read selection failed")
             ui.set_error(f"Unexpected error: {exc}")
 
+    def read_text(text: str) -> None:
+        try:
+            ui.clear_error()
+            ui.set_status("Reading text...")
+            logging.info("Read text requested")
+            if not text:
+                ui.set_status("Ready")
+                ui.set_error("No text provided. Paste text and try again.")
+                return
+            if speaker is None:
+                ui.set_status("Ready")
+                ui.set_error("TTS is not initialized.")
+                return
+            speaker.speak(text)
+        except Exception as exc:
+            logging.exception("Read text failed")
+            ui.set_error(f"Unexpected error: {exc}")
+
     def test_voice() -> None:
         try:
             ui.clear_error()
@@ -69,6 +87,7 @@ def main() -> None:
 
     ui = StatusUi(
         on_read_selection=read_selection,
+        on_read_text=read_text,
         on_stop=stop,
         on_test_voice=test_voice,
         on_quit=cleanup,

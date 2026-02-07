@@ -6,16 +6,18 @@ class StatusUi:
     def __init__(
         self,
         on_read_selection: Callable[[], None],
+        on_read_text: Callable[[str], None],
         on_stop: Callable[[], None],
         on_test_voice: Callable[[], None],
         on_quit: Callable[[], None],
         log_path: str | None = None,
     ) -> None:
         self._on_quit = on_quit
+        self._on_read_text = on_read_text
 
         self.root = tk.Tk()
         self.root.title("Readaloud Tool")
-        self.root.geometry("420x220")
+        self.root.geometry("480x400")
         self.root.resizable(False, False)
         self.root.protocol("WM_DELETE_WINDOW", self._handle_close)
 
@@ -30,6 +32,20 @@ class StatusUi:
 
         error = tk.Label(self.root, textvariable=self._error_var, font=("Segoe UI", 9), fg="firebrick")
         error.pack(pady=(2, 6))
+
+        # Text input area
+        text_frame = tk.Frame(self.root)
+        text_frame.pack(pady=(4, 8), padx=10, fill=tk.BOTH, expand=True)
+
+        text_label = tk.Label(text_frame, text="Paste text here:", font=("Segoe UI", 9))
+        text_label.pack(anchor="w")
+
+        self._text_box = tk.Text(text_frame, height=8, width=55, font=("Segoe UI", 9), wrap=tk.WORD)
+        self._text_box.pack(fill=tk.BOTH, expand=True)
+
+        # Read Text button
+        read_text_btn = tk.Button(self.root, text="Read Text", width=20, command=self._read_text_from_box)
+        read_text_btn.pack(pady=(4, 8))
 
         button_row = tk.Frame(self.root)
         button_row.pack(pady=(4, 8))
@@ -85,3 +101,7 @@ class StatusUi:
 
     def _handle_close(self) -> None:
         self._on_quit()
+
+    def _read_text_from_box(self) -> None:
+        text = self._text_box.get("1.0", tk.END).strip()
+        self._on_read_text(text)
