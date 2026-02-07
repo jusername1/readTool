@@ -25,7 +25,7 @@ A lightweight Windows tool that reads selected text aloud using OpenAI Text-to-S
 1. **Clone the repository**
 
 ```bash
-git clone https://github.com/yourusername/readTool.git
+git clone https://github.com/jusername1/readTool.git
 cd readTool
 ```
 
