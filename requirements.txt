@@ -1,0 +1,5 @@
+openai>=1.0.0
+keyboard>=0.13.5
+pywin32>=306
+python-dotenv>=1.0.0
+simpleaudio>=1.0.4
